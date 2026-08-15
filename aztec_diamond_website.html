@@ -1,0 +1,410 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>blah YourTitleGoesHere, for the first time</title>
+<script src="https://sagecell.sagemath.org/static/jquery.min.js"></script>
+<script src="https://sagecell.sagemath.org/embedded_sagecell.js"></script>
+<script>
+$(function () {
+// Make *any* div with class 'compute' a Sage cell
+sagecell.makeSagecell({inputLocation: 'div.compute',
+template: sagecell.templates.minimal,
+evalButtonText: 'Launch the Interactive Applet Now'});
+});
+</script>
+</head>
+<body style="width: 1000px;">
+<! you may start modifying below this point!>
+<! you may start modifying below this point!>
+<h1>blah YourTitleGoesHere, for the second time</h1>
+<p>An Interactive Applet powered by Sage and MathJax.</p>
+<p>(By YourNameGoesHere)</p>
+<hr>
+<h2>Overview</h2>
+<p>blah blah blah</p>
+<p>yada yada yada</p>
+<h2>Instructions</h2>
+<p>blah blah blah</p>
+<p>yada yada yada</p>
+<div class="compute">
+<script type="text/x-sage">
+
+from enum import StrEnum
+from typing import Self
+import random
+
+class AbstractSquare:
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+    def coords(self) -> tuple[float, float]:
+        return (self.x, self.y)
+
+    def __hash__(self) -> int:
+        return hash(self.coords())
+
+    def __repr__(self):
+        return f"({self.x}, {self.y})"
+        
+
+    def __eq__(self, other) -> bool: # defines what == means for that class (and, for free, also the hash of the class)
+        if not isinstance(other, AbstractSquare):
+            return NotImplementedError
+
+        return self.coords() == other.coords()
+
+    def __lt__(self, other):
+        if not isinstance(other, AbstractSquare):
+            raise NotImplementedError
+
+        if self.x == other.x:
+            return self.y < other.y
+
+        return self.x < other.x
+
+    def corners(self) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]:
+        half_radius = self.half_radius()
+        return [
+            (self.x - half_radius, self.y - half_radius),
+            (self.x + half_radius, self.y - half_radius),
+            (self.x + half_radius, self.y + half_radius),
+            (self.x - half_radius, self.y + half_radius)
+        ]
+
+    def draw(self, G: Graphics, color: tuple[float,float,float] = (1,1,1)) -> Graphics: #to do: add color arguement
+        rectangle = polygon(self.corners(),rgbcolor=color)
+        #rectangle.show()
+        
+        G += rectangle
+        return G
+
+    def shift(self, delta: tuple[float, float]): #-> AbstractSquare:
+        dx, dy = delta
+        return self.__class__(self.x + dx, self.y + dy) #dunder method that give you your instance's class --> eg. if in small sq give self.SmallSquare.....
+
+    @classmethod
+    def half_radius(cls) -> float:
+        raise NotImplementedError
+
+    def contains(self, other: object) -> bool:
+        if not isinstance(other, AbstractSquare):
+            raise NotImplementedError
+        threshold = self.half_radius() + other.half_radius()
+        if abs(self.x - other.x) >= threshold:
+            return False
+        if abs(self.y - other.y) >= threshold:
+            return False
+        return True
+    
+class SmallSquare(AbstractSquare):
+    @classmethod
+    def half_radius(cls) -> float:
+        return 0.5
+    
+class Direction(StrEnum): #now we know that direction is one of these 4 things (not just any string)
+    UP = "up"
+    DOWN = "down"
+    LEFT = "left"
+    RIGHT = "right"
+    
+class Domino:
+    def __init__(self, sq1: SmallSquare, sq2: SmallSquare, direction: Direction):
+        self.sq1 = sq1
+        self.sq2 = sq2
+        self.direction = direction
+
+    def __eq__(self, other: object) -> bool:
+        if other is None:
+            return False
+            
+        if not isinstance(other, Domino): #says: only compare the things we want to compare
+            return NotImplementedError(f'{type(other)} != Domino')
+
+        return self.sq1 == other.sq1 and self.sq2 == other.sq2
+
+
+    def __hash__(self):
+        return hash(f'{self.sq1.coords()},{self.sq2.coords()}')
+
+    def draw(self, G: Graphics) -> Graphics: #todo- select color by direction
+        #make plot sq1 then sqr2 (use previous method)
+        if self.direction == Direction.UP: # direction is a member variavle, Direction is a class
+            color = (0,0,1)
+        elif self.direction == Direction.DOWN:
+            color = (0,1,0)
+        elif self.direction == Direction.LEFT:
+            color = (1,1,0)
+        else:# self.direction == Direction.RIGHT:
+            color = (1,0,0)
+        G_with_square_1 = self.sq1.draw(G,color)
+        G_with_both_squares = self.sq2.draw(G_with_square_1,color)
+
+        # If you wanted to draw an arrow too, this would be a good place to do it!
+        
+        return G_with_both_squares
+
+    def expand(self) -> 'Domino':
+        if self.direction == Direction.UP: # direction is a member variavle, Direction is a class
+            delta = (0,1)
+        elif self.direction == Direction.DOWN:
+            delta = (0,-1)
+        elif self.direction == Direction.LEFT:
+            delta = (-1,0)
+        else:# self.direction == Direction.RIGHT:
+            delta = (1,0)
+
+        return self.__class__(self.sq1.shift(delta),self.sq2.shift(delta),self.direction) #were telling the .shift() to go into the sq and make a new one with our changes
+
+class BigSquare(AbstractSquare):
+    @classmethod
+    def half_radius(cls) -> float:
+        return 1.0
+        
+    
+    def split(self) -> tuple[SmallSquare, SmallSquare, SmallSquare, SmallSquare]:
+        #now idea of small sqr not an instance (class method)
+        radius = SmallSquare.half_radius()
+        return (
+            SmallSquare(self.x - radius, self.y + radius), #top left
+            SmallSquare(self.x + radius, self.y + radius), #top right
+            SmallSquare(self.x - radius, self.y - radius), #bottom left
+            SmallSquare(self.x + radius, self.y - radius), #bottom right
+        )
+    
+    def make_dominos(self) -> tuple[Domino, Domino]:
+        if 0 == random.randint(0, 1):
+            return self.make_vertical_dominos()
+        else:
+            return self.make_horizontal_dominos()
+
+    def make_vertical_dominos(self) -> tuple[Domino, Domino]:
+        tl, tr, bl, br = self.split() # with a tuple can have automatically split
+        domino_1 = Domino(tl,bl,Direction.LEFT)
+        domino_2 = Domino(tr,br,Direction.RIGHT)
+        return (domino_1, domino_2)
+        
+
+    def make_horizontal_dominos(self) -> tuple[Domino, Domino]:
+        tl, tr, bl, br = self.split() # with a tuple can have automatically split
+        domino_1 = Domino(tl,tr,Direction.UP)
+        domino_2 = Domino(bl,br,Direction.DOWN)
+        return (domino_1, domino_2)
+
+
+    @classmethod
+    def from_small_squares(cls, squares: tuple[SmallSquare, SmallSquare, SmallSquare, SmallSquare]) -> Self:
+        x = sum(sq.x for sq in squares) / 4
+        y = sum(sq.y for sq in squares) / 4
+        return cls(x, y)
+    
+class Diamond:
+    def __init__(self, dominos: list[Domino], iteration_counter: int):
+        #self.big_squares = big_squares
+        self.dominos = dominos
+        self.iteration_counter = iteration_counter
+
+        #have counter that gets increased each time we do squaredance.expand
+    def draw(self) -> Graphics:
+        G = Graphics()
+        for domino in self.dominos:
+            G = domino.draw(G)
+
+        #for square in self.big_squares:
+            #G = square.draw(G, (0.5, 0.5, 0.5))
+        return G
+            
+class SquareDance:
+
+    @staticmethod
+    def diamond_as_small_squares(new_iteration_counter: int):  
+    
+        small_squares_q1: list[SmallSquare] = []
+     
+        offset: int = 0
+        while new_iteration_counter != 0:
+            for j in range(new_iteration_counter):
+                small_squares_q1.append(SmallSquare(0.5 + offset, 0.5 + j))      
+            new_iteration_counter -= 1
+            offset += 1
+    
+        small_squares_all: list[SmallSquare] = []       
+        for small_square in small_squares_q1:
+            i, j = small_square.x, small_square.y
+            for (x, y) in [(i, j), (-i, j), (i, -j), (-i, -j)]:
+                small_squares_all.append(SmallSquare(x,y))
+            
+        return small_squares_all
+        
+    
+    @staticmethod
+    def base_case() -> Diamond:
+        if 0 == random.randint(0, 1):
+            domino_1 = Domino(SmallSquare(.5,-.5),SmallSquare(.5,.5),Direction.RIGHT)
+            domino_2 = Domino(SmallSquare(-.5,-.5),SmallSquare(-.5,.5),Direction.LEFT)
+        else:
+            domino_1 = Domino(SmallSquare(-.5,.5),SmallSquare(.5,.5),Direction.UP)
+            domino_2 = Domino(SmallSquare(-.5,-.5),SmallSquare(.5,-.5),Direction.DOWN)
+        return Diamond([domino_1,domino_2], 1)
+
+
+    @staticmethod
+    def diamond_as_small_squares(new_iteration_counter: int):  
+    
+        small_squares_q1: list[SmallSquare] = []
+     
+        offset: int = 0
+        while new_iteration_counter != 0:
+            for j in range(new_iteration_counter):
+                small_squares_q1.append(SmallSquare(0.5 + offset, 0.5 + j))      
+            new_iteration_counter -= 1
+            offset += 1
+    
+        small_squares_all: list[SmallSquare] = []       
+        for small_square in small_squares_q1:
+            i, j = small_square.x, small_square.y
+            for (x, y) in [(i, j), (-i, j), (i, -j), (-i, -j)]:
+                small_squares_all.append(SmallSquare(x,y))
+            
+        return small_squares_all
+    @staticmethod #decorator- says'here's something special' 
+    #static means- stored in the class not realted to an instance
+    def expand(prev_diamond: Diamond): #-> tuple[Diamond,list[BigSquare],Graphics]:
+#1) make dominos move
+        new_iteration_counter = prev_diamond.iteration_counter+1
+        existing_dominos = prev_diamond.dominos
+
+            # 1. Build full plan: each domino -> its expansion
+        domino_plan: dict[Domino, Domino] = {}
+        for domino in existing_dominos:
+            domino_plan[domino] = domino.expand()
+        
+        # 2. Find swaps: pairs (d1, d2) where d1 expands to d2 and d2 expands to d1
+        to_remove = set()
+        
+        for d1, e1 in domino_plan.items():
+            d2 = e1                       # candidate partner
+            e2 = domino_plan.get(d2)      # what does d2 expand to?
+            if e2 is not None and e2 == d1:
+                # We have d1 -> d2 and d2 -> d1: a swap
+                to_remove.add(d1)
+                to_remove.add(d2)
+        
+        # 3. Remove both dominos in each swapping pair
+        for d in to_remove:
+            if d in domino_plan:
+                del domino_plan[d]
+        new_dominos = list(domino_plan.values())
+# works up untill here
+
+        
+        all_small_squares = SquareDance.diamond_as_small_squares(new_iteration_counter)
+        uncovered_small_squares = set()
+        for small_square in all_small_squares:
+            is_covered = False
+            for domino in new_dominos:
+                if domino.sq1.contains(small_square) or domino.sq2.contains(small_square):
+                    is_covered = True
+                    break
+            if not is_covered:
+                uncovered_small_squares.add(small_square)
+        
+        
+        G = Graphics()
+        for small_square in uncovered_small_squares:
+            G = small_square.draw(G,(.5,.5,.5))
+                                    
+        big_squares = []
+        while len(uncovered_small_squares) > 0:
+            sorted_squares = sorted(uncovered_small_squares)
+            anchor = sorted_squares[0]
+        
+            # anchor has minimal x (and minimal y among those), so it must be
+            # either the bottom-left or top-left corner of its 2x2 hole —
+            # try both and use whichever one actually has all 4 squares present.
+            candidates = [
+                (anchor, anchor.shift((0,1)), anchor.shift((1,0)), anchor.shift((1,1))),   # anchor = bl
+                (anchor.shift((0,-1)), anchor, anchor.shift((1,-1)), anchor.shift((1,0))), # anchor = tl
+            ]
+        
+            block = None
+            for bl, tl, br, tr in candidates:
+                if (bl in uncovered_small_squares and tl in uncovered_small_squares
+                        and br in uncovered_small_squares and tr in uncovered_small_squares):
+                    block = (bl, tl, br, tr)
+                    break
+        
+            assert block is not None, f"couldn't find a valid 2x2 hole containing {anchor}"
+            bl, tl, br, tr = block
+        
+            big_squares.append(BigSquare.from_small_squares((tl, tr, bl, br)))
+        
+            uncovered_small_squares.remove(bl)
+            uncovered_small_squares.remove(tl)
+            uncovered_small_squares.remove(br)
+            uncovered_small_squares.remove(tr)
+                    
+
+        for big_square in big_squares: #will make a list of tuples, this is turning the big sqrs in
+                d1,d2 = big_square.make_dominos()
+                new_dominos.extend([d1,d2])
+                
+        return(Diamond(new_dominos,new_iteration_counter), G)  
+
+
+
+iteration_options = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+
+@interact
+def interact_aztec(n=selector(iteration_options, label='iterations:')):
+    n = int(n)
+    if n < 0:
+        print('Please input a positive number')
+        return
+    
+    frames = []
+    bound = n + 1
+    label_height = 1.5  # extra space reserved above the diamond for the label
+    ymax = bound + label_height
+    
+    def label_for(k):
+        return text(f'Iteration {k}', (0, bound + 0.7), fontsize=16, color='black')
+    
+    big_square = BigSquare(0,0)
+    G = Graphics()
+    big_square_draw = big_square.draw(G,(.5,.5,.5))
+    frames.append(big_square_draw + label_for(0))
+    
+    base_case = SquareDance.base_case()
+    base_case_draw = base_case.draw()
+    frames.append(base_case_draw + label_for(0))
+    
+    next_diamond = base_case
+    
+    if n > 0:
+        next_diamond, G = SquareDance.expand(base_case)
+        diamond_1_draw = next_diamond.draw()
+        frames.append(diamond_1_draw + G + label_for(1))
+        frames.append(diamond_1_draw + label_for(1))
+    
+    for i in range(2, n+1):
+        next_diamond, G = SquareDance.expand(next_diamond)
+        next_diamond_draw = next_diamond.draw()
+        frames.append(next_diamond_draw + G + label_for(i))
+        frames.append(next_diamond_draw + label_for(i))
+    
+    a = animate(frames, xmin=-bound, xmax=bound, ymin=-bound, ymax=ymax, aspect_ratio=1)
+    a.show(delay=100)
+
+</script>
+</div>
+
+<h2>Discussion</h2>
+<p>blah blah blah</p>
+<p>yada yada yada</p>
+<hr>
+Last modified on PutTheDateHere.
+</body>
+</html>
